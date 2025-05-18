@@ -4,8 +4,28 @@ html,
 body {
   @apply bg-white dark:bg-neutral-900;
   @apply text-red-500 dark:text-neutral-300;
+  font-family: 'M PLUS 1p', sans-serif;
 
   @media (prefers-color-scheme: dark) {
     color-scheme: dark;
   }
+}
+
+button, input, textarea {
+  background: none;
+  border: none;
+  outline: none;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  line-height: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* デバッグ用 */
+.highlighter {
+  @apply border-1 border-white;
 }

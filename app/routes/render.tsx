@@ -1,6 +1,7 @@
 import 'katex/dist/katex.min.css'
 import katex from 'katex'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { getWholeStruct, structIndent } from '~/lib/html-struct'
 
 export function meta() {
   return [{ title: 'Drift' }, { name: 'description', content: 'KaTeX表示' }]
@@ -8,35 +9,59 @@ export function meta() {
 
 export default function Render() {
   const mathRef = useRef<HTMLDivElement>(null)
+  const [latex, setLatex] = useState('\\frac{2a+3}{5}=1')
 
   useEffect(() => {
     if (mathRef.current) {
-      const html = katex.renderToString('\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}', {
-        output: 'html',
-        throwOnError: false,
-        displayMode: true,
-      })
+      try {
+        const html = katex.renderToString(latex, {
+          output: 'html',
+          throwOnError: false,
+          displayMode: true,
+          macros: {
+            '\\log': '\\mathop{\\mathrm{log}}',
+          },
+        })
 
-      // HTML要素に挿入
-      mathRef.current.innerHTML = html
+        mathRef.current.innerHTML = html
+      } catch (error) {
+        console.error('KaTeX rendering error:', error)
+      }
 
-      // レンダリングされた数式のHTML構造を解析
-      console.log('レンダリングされた数式のHTML:', mathRef.current.innerHTML)
-
-      // 例: 特定のクラスを持つ要素を取得
-      const spans = mathRef.current.querySelectorAll('span.katex-html')
-      console.log('KaTeX HTML要素:', spans)
-
-      // さらに詳細な解析を行うことができます
-      // ...
+      setTimeout(() => {
+        if (mathRef.current) {
+          console.log(structIndent(getWholeStruct(mathRef.current)))
+        }
+      }, 0)
     }
-  }, [])
+  }, [latex])
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLatex(e.target.value)
+  }
 
   return (
-    <>
-      <div className='w-screen h-screen flex flex-col items-center justify-center bg-dark'>
-        <div ref={mathRef}></div>
-      </div>
-    </>
+    <div className='w-screen h-screen flex flex-col items-center justify-center'>
+      <style>{`
+        .katex * {
+          outline: 0.1px solid green;
+        }
+      `}</style>
+      <div ref={mathRef}></div>
+      <input
+        type='text'
+        value={latex}
+        onChange={handleInputChange}
+        placeholder=''
+        style={{ textAlign: 'center', fontFamily: 'M PLUS Code Latin' }}
+        className='w-full'
+      />
+    </div>
   )
 }
+
+// 1. 初期状態は何もないとする
+
+// 2. クリックされた位置にある記号を取得（数式の木構造の葉の位置から総当たり）し、入力が可能な状態にする
+// 3. 入力を受けて木構造を更新し、それに合わせて LaTeX 式を更新、DOM 構造も更新する
+// 4. 全体的に DOM 構造が書き変わってしまうので、前の構造と後の構造を比較して現在入力中の位置を再度特定する
