@@ -2,6 +2,8 @@ import 'katex/dist/katex.min.css'
 import katex from 'katex'
 import { useEffect, useRef, useState } from 'react'
 import { getWholeStruct, structIndent } from '~/lib/html-struct'
+import { isConsistent, makeLaTeX } from '~/lib/scope'
+import { sampleScope } from '~/lib/sample-data'
 
 export function meta() {
   return [{ title: 'Drift' }, { name: 'description', content: 'KaTeX表示' }]
@@ -9,7 +11,7 @@ export function meta() {
 
 export default function Render() {
   const mathRef = useRef<HTMLDivElement>(null)
-  const [latex, setLatex] = useState('\\frac{2a+3}{5}=1')
+  const [latex, setLatex] = useState(makeLaTeX(sampleScope))
 
   useEffect(() => {
     if (mathRef.current) {
@@ -30,7 +32,9 @@ export default function Render() {
 
       setTimeout(() => {
         if (mathRef.current) {
-          console.log(structIndent(getWholeStruct(mathRef.current)))
+          const struct = getWholeStruct(mathRef.current)
+          console.log(structIndent(struct))
+          console.log(isConsistent(struct, sampleScope))
         }
       }, 0)
     }

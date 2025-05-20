@@ -1,6 +1,13 @@
 // KaTeX の HTMLElement から構造と座標を抽出する
 // 中間層に大量の位置合わせの span が挟まっているので、それらを外してシンプルな階層を得る
 
+// 呼ばれる関数
+export const getWholeStruct = (display: HTMLElement) => {
+  return getStruct(getDescendants(display, 3)[0] as HTMLElement)
+  // katex-display > katex > katex-html > base
+}
+
+// HTML 要素の子要素を全て取得
 const getChildElems = (element: HTMLElement) => {
   const children = Array.from(element.children) as HTMLElement[]
   const childElems: HTMLElement[] = []
@@ -18,14 +25,14 @@ const getChildElems = (element: HTMLElement) => {
   return childElems
 }
 
-export const getWholeStruct = (display: HTMLElement) => {
-  return getStruct(getDescendants(display, 3)[0] as HTMLElement)
-  // katex-display > katex > katex-html > base
-}
-
 // 再帰的にその要素全体の中間構造を得る
-export const getStruct = (me: HTMLElement) => {
+const getStruct = (me: HTMLElement): Struct => {
   const childElems = getChildElems(me)
+
+  // その要素が 1 つしか子を含まない場合
+  if (childElems.length == 1) {
+    return getStruct(childElems[0])
+  }
 
   // その要素が最下層である場合
   if (childElems.length == 0) {
@@ -40,7 +47,7 @@ export const getStruct = (me: HTMLElement) => {
   if (childElems.length > 2 && childElems[1].className.split(' ').includes('mfrac')) {
     return {
       Element: me,
-      Children: fracScope(me),
+      Children: fracStruct(me),
       Type: 'Frac',
       Character: me.textContent?.trim() || '',
     } as Struct
@@ -64,19 +71,27 @@ export const getStruct = (me: HTMLElement) => {
   } as Struct
 }
 
-// 分数の Struct を scopes に追加
-const fracScope = (me: HTMLElement) => {
-  const column: Struct[] = []
-
-  for (const grand of getDescendants(me.children[1] as HTMLElement, 4)) {
-    const elem = grand.children[1] as HTMLElement
-    if (elem.className.split(' ').includes('mord')) {
-      column.push(getStruct(elem))
-    }
+// 分数の Struct を取得
+const fracStruct = (me: HTMLElement) => {
+  const elements = getDescendants(me.children[1] as HTMLElement, 4)
+  if (elements.length != 3) {
+    throw new Error('分数の構造が不正です')
   }
-  return column
+
+  return [
+    getStruct(elements[2].children[1] as HTMLElement),
+    getStruct(elements[0].children[1] as HTMLElement),
+  ]
 }
-// この状態だと a^2 と a_2 の区別がつかないが、あとでクラス vlist-t2 の存在・不在から区別をつけるように
+
+// gens 層だけ下の子要素を取得。そこまでは最初の子を辿る
+const getDescendants = (me: HTMLElement, gens: number) => {
+  let elem: HTMLElement = me
+  for (let i = 0; i < gens - 1; i++) {
+    elem = elem.children[0] as HTMLElement
+  }
+  return getChildElems(elem)
+}
 
 // Struct の階層構造を表示
 export const structIndent = (scope: Struct, indent: number = 0) => {
@@ -88,12 +103,4 @@ export const structIndent = (scope: Struct, indent: number = 0) => {
     text += '\n' + structIndent(child, indent + 1)
   }
   return text
-}
-
-export const getDescendants = (me: HTMLElement, gens: number) => {
-  let elem: HTMLElement = me
-  for (let i = 0; i < gens - 1; i++) {
-    elem = elem.children[0] as HTMLElement
-  }
-  return getChildElems(elem)
 }
