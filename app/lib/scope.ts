@@ -24,30 +24,30 @@ const getLinearChildren = (me: Scope) => {
 }
 
 // struct と scope が対応する構造を持つか確認する
-export const isConsistent = (struct: Struct, scope: Scope): boolean => {
+export const matchScope = (struct: Struct, scope: Scope): DOMRect => {
   switch (scope.Type) {
     case 'Sum':
       if (struct.Type != 'Linear') {
         console.error('Sum スコープに Linear 以外の構造が対応しています', struct, scope)
-        return false
+        throw new Error('Sum スコープに Linear 以外の構造が対応しています')
       }
       break
     case 'Product':
       if (struct.Type != 'Linear') {
         console.error('Product スコープに Linear 以外の構造が対応しています', struct, scope)
-        return false
+        throw new Error('Product スコープに Linear 以外の構造が対応しています')
       }
       break
     case 'Frac':
       if (struct.Type != 'Frac') {
         console.error('Fraac スコープに Frac 以外の構造が対応しています', struct, scope)
-        return false
+        throw new Error('Frac スコープに Frac 以外の構造が対応しています')
       }
       break
     case undefined:
       if (struct.Type != undefined) {
         console.error('スコープの葉に葉でない構造が対応しています', struct, scope)
-        return false
+        throw new Error('スコープの葉に葉でない構造が対応しています')
       }
       break
   }
@@ -56,9 +56,11 @@ export const isConsistent = (struct: Struct, scope: Scope): boolean => {
   if (!struct.Type && !scope.Type) {
     if (struct.Character != scope.Character) {
       console.error('スコープと構造の葉同士の文字が一致しません', struct, scope)
-      return false
+      throw new Error('スコープと構造の葉同士の文字が一致しません')
     } else {
-      return true
+      scope.Rect = struct.Element.getBoundingClientRect()
+      struct.Element.classList.add('drift-scope')
+      return scope.Rect
     }
   }
 
@@ -68,15 +70,37 @@ export const isConsistent = (struct: Struct, scope: Scope): boolean => {
 
   if (struct.Children.length != scopeChildren.length) {
     console.error('スコープと構造の子要素の数が一致しません', struct, scopeChildren)
-    return false // 子要素の数が異なる場合、構造が異なる
+    throw new Error('スコープと構造の子要素の数が一致しません')
   }
 
-  let isAllCons = true
+  // 初期値を設定
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+
+  // 各子要素の DOMRect を取得し、範囲を更新
   for (let i = 0; i < scopeChildren.length; i++) {
-    isAllCons = isAllCons && isConsistent(struct.Children[i], scopeChildren[i])
+    const childRect = matchScope(struct.Children[i], scopeChildren[i])
+    if (childRect) {
+      minX = Math.min(minX, childRect.left)
+      minY = Math.min(minY, childRect.top)
+      maxX = Math.max(maxX, childRect.right)
+      maxY = Math.max(maxY, childRect.bottom)
+    }
   }
 
-  return isAllCons
+  // 全ての子要素を包む DOMRect を作成
+  if (minX !== Infinity) {
+    const width = maxX - minX
+    const height = maxY - minY
+    scope.Rect = new DOMRect(minX, minY, width, height)
+    struct.Element.classList.add('drift-scope')
+    return scope.Rect
+  }
+
+  // 子要素がない場合の対応
+  return new DOMRect(0, 0, 0, 0)
 }
 
 // scope から LaTeX 式を生成

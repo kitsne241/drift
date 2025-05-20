@@ -12,7 +12,7 @@ const getChildElems = (element: HTMLElement) => {
   const children = Array.from(element.children) as HTMLElement[]
   const childElems: HTMLElement[] = []
 
-  if (element.className == 'katex-html') {
+  if (element.classList.contains('katex-html')) {
     // 最上層の要素 katex-html でこれを実行した場合のみ base を飛ばして 2 層下にあるものを得る
     for (const child of children) {
       childElems.push(...getChildElems(child))
@@ -57,7 +57,7 @@ const getStruct = (me: HTMLElement): Struct => {
   const children = [] as Struct[]
   for (const child of childElems) {
     for (const className of ['mord', 'mbin', 'mrel']) {
-      if (child.className.split(' ').includes(className)) {
+      if (child.classList.contains(className)) {
         children.push(getStruct(child))
         break
       }

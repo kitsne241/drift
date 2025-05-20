@@ -2,7 +2,7 @@ import 'katex/dist/katex.min.css'
 import katex from 'katex'
 import { useEffect, useRef, useState } from 'react'
 import { getWholeStruct, structIndent } from '~/lib/html-struct'
-import { isConsistent, makeLaTeX } from '~/lib/scope'
+import { matchScope, makeLaTeX } from '~/lib/scope'
 import { sampleScope } from '~/lib/sample-data'
 
 export function meta() {
@@ -34,7 +34,7 @@ export default function Render() {
         if (mathRef.current) {
           const struct = getWholeStruct(mathRef.current)
           console.log(structIndent(struct))
-          console.log(isConsistent(struct, sampleScope))
+          console.log(matchScope(struct, sampleScope))
         }
       }, 0)
     }
@@ -47,7 +47,7 @@ export default function Render() {
   return (
     <div className='w-screen h-screen flex flex-col items-center justify-center'>
       <style>{`
-        .katex * {
+        .drift-scope {
           outline: 0.1px solid green;
         }
       `}</style>
