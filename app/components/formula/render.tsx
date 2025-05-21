@@ -2,7 +2,7 @@ import 'katex/dist/katex.min.css'
 import katex from 'katex'
 import { useEffect, useRef, useState } from 'react'
 import { getWholeStruct, structIndent } from '~/lib/html-struct'
-import { reLink, getRect, genCode, clickScope } from '~/lib/scope'
+import { reLink, getRect, genCode, selectScope } from '~/lib/scope'
 import { sampleScope } from '~/lib/sample-data'
 
 export function meta() {
@@ -18,7 +18,8 @@ export default function Render() {
     display: 'none',
   })
 
-  // const [code, setCode] = useState(genCode(sampleScope))
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStartPoint, setDragStartPoint] = useState<DOMPoint | null>(null)
 
   useEffect(() => {
     if (!mathRef.current) return
@@ -53,31 +54,43 @@ export default function Render() {
     }
   }
 
-  const handleClick = (event: React.MouseEvent) => {
-    const clicked = clickScope(event, scope)
+  const handleMouseDown = (event: React.MouseEvent) => {
+    const point = new DOMPoint(event.clientX, event.clientY)
+    setIsDragging(true)
+    setDragStartPoint(point)
+    updateSelectionHighlight(point, point)
+  }
 
-    if (!clicked || !clicked.rect) {
-      // クリックした場所が数式要素でなければハイライトを隠す
+  const handleMouseMove = (event: React.MouseEvent) => {
+    if (!isDragging || !dragStartPoint) return
+    const currentPoint = new DOMPoint(event.clientX, event.clientY)
+    updateSelectionHighlight(dragStartPoint, currentPoint)
+  }
+
+  // 選択範囲のハイライト更新
+  const updateSelectionHighlight = (start: DOMPoint, end: DOMPoint) => {
+    const selectedScope = selectScope(start, end, scope)
+
+    if (!selectedScope || !selectedScope.rect) {
       setHighlightStyle({ display: 'none' })
       return
     }
 
-    // ハイライトスタイルを更新
     setHighlightStyle({
       display: 'block',
-      left: `${clicked.rect.x}px`,
-      top: `${clicked.rect.y}px`,
-      width: `${clicked.rect.width}px`,
-      height: `${clicked.rect.height}px`,
+      left: `${selectedScope.rect.x}px`,
+      top: `${selectedScope.rect.y}px`,
+      width: `${selectedScope.rect.width}px`,
+      height: `${selectedScope.rect.height}px`,
     })
-
-    console.log('Clicked formula element:', clicked)
   }
 
   return (
     <div
       ref={containerRef}
-      onClick={handleClick}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={() => setIsDragging(false)}
       className='highlighter flex items-center justify-center relative'
     >
       <div ref={highlightRef} className='formula-highlight-element' style={highlightStyle} />

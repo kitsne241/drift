@@ -110,22 +110,19 @@ export const genCode = (scope: Scope): string => {
   }
 }
 
-export const clickScope = (event: React.MouseEvent, scope: Scope): Scope => {
-  const clicked = scope
+// rect に p が含まれるかどうか
+const isPointInRect = (p: DOMPoint, rect: DOMRect) =>
+  p.x >= rect.left && p.x <= rect.right && p.y >= rect.top && p.y <= rect.bottom
 
-  for (const child of clicked.children) {
-    if (child.rect) {
-      if (
-        child.rect &&
-        event.clientX >= child.rect.left &&
-        event.clientX <= child.rect.right &&
-        event.clientY >= child.rect.top &&
-        event.clientY <= child.rect.bottom
-      ) {
-        return clickScope(event, child)
-      }
+// 2 点を包含する最小のスコープを取得
+export const selectScope = (start: DOMPoint, end: DOMPoint, scope: Scope): Scope => {
+  const selected = scope
+
+  for (const child of scope.children) {
+    if (child.rect && isPointInRect(start, child.rect) && isPointInRect(end, child.rect)) {
+      return selectScope(start, end, child)
     }
   }
 
-  return scope
+  return selected
 }
