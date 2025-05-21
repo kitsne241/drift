@@ -110,18 +110,22 @@ export const genCode = (scope: Scope): string => {
   }
 }
 
-export const createElementFromRect = (rect: DOMRect, tagName: string = 'div') => {
-  const element = document.createElement(tagName)
+export const clickScope = (event: React.MouseEvent, scope: Scope): Scope => {
+  const clicked = scope
 
-  // 絶対配置で位置とサイズを設定
-  element.style.position = 'absolute'
-  element.style.left = `${rect.left}px`
-  element.style.top = `${rect.top}px`
-  element.style.width = `${rect.width}px`
-  element.style.height = `${rect.height}px`
+  for (const child of clicked.children) {
+    if (child.rect) {
+      if (
+        child.rect &&
+        event.clientX >= child.rect.left &&
+        event.clientX <= child.rect.right &&
+        event.clientY >= child.rect.top &&
+        event.clientY <= child.rect.bottom
+      ) {
+        return clickScope(event, child)
+      }
+    }
+  }
 
-  // 半透明の青色を設定
-  element.style.backgroundColor = 'rgba(0, 0, 255, 0.3)' // 青色で30%の不透明度
-
-  return element
+  return scope
 }

@@ -2,8 +2,8 @@
 
 html,
 body {
-  @apply bg-white dark:bg-neutral-900;
-  @apply text-red-500 dark:text-neutral-300;
+  @apply bg-neutral-100 dark:bg-neutral-900;
+  @apply text-neutral-700 dark:text-neutral-300;
   font-family: 'M PLUS 1p', sans-serif;
 
   @media (prefers-color-scheme: dark) {
@@ -27,5 +27,14 @@ button {
 
 /* デバッグ用 */
 .highlighter {
-  @apply border-1 border-white;
+  @apply border-1 border-black dark:border-white;
+}
+
+/* 数式ハイライト用 */
+.formula-highlight-element {
+  box-sizing: border-box;
+  position: fixed;
+  background-color: rgba(0, 127, 255, 0.2);
+  border-radius: 1px;
+  pointer-events: none;
 }
