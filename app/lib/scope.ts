@@ -52,15 +52,29 @@ export class Scope {
       case 'Frac':
         return '\\frac{' + this.children.map((child) => child.toCode()).join('}{') + '}'
 
-      default:
-        return this.character || ''
+      case 'Single':
+        if (this.character && ['=', '-', '+'].includes(this.character)) {
+          return this.character || ''
+        } else {
+          return '{' + this.character + '}' || ''
+        }
     }
   }
 
-  // scope に child を追加
-  addChild(child: Scope) {
+  // scope に child を挿入
+  insertChild(child: Scope, index: number) {
     child.parent = this
-    this.children.push(child)
+    this.children.splice(index, 0, child)
+    return child // parent を反映させた child を返す
+  }
+
+  // scope から child を削除
+  removeChild(child: Scope) {
+    const index = this.children.indexOf(child)
+    if (index !== -1) {
+      this.children.splice(index, 1)
+      child.parent = null
+    }
     return child // parent を反映させた child を返す
   }
 
@@ -119,7 +133,7 @@ export class Scope {
         break
       case 'Frac':
         if (struct.type != 'Frac') {
-          console.error('Fraac スコープに Frac 以外の構造が対応しています', struct, this)
+          console.error('Frac スコープに Frac 以外の構造が対応しています', struct, this)
           throw new Error('Frac スコープに Frac 以外の構造が対応しています')
         }
         break
@@ -183,17 +197,38 @@ export class Scope {
       }
     }
 
-    return this // この階層のスコープを返す
+    return this
   }
 
   // スコープの編集
-  edit(key: string): void {
-    // scope が葉であり、かつ key が a ~ z、A ~ Z の文字である場合には、積スコープを生成
-    if (this.type == undefined && /^[a-zA-Z]$/.test(key)) {
-      this.type = 'Product'
-      this.children = []
-      this.character = key
+  edit(key: string) {
+    if (key == 'Backspace') {
+      this.parent?.removeChild(this)
+      return
     }
-    // 他の編集ケースをここに追加
+
+    // scope が葉である場合
+    if (this.type == 'Single') {
+      // key が a ~ z、A ~ Z、0 ~ 9 の文字である場合
+      if (/^[a-zA-Z0-9]$/.test(key)) {
+        // 親スコープが積スコープである場合
+        if (this.parent?.type == 'Product') {
+          // 親スコープに子要素を追加
+          const newScope = new Scope({ type: 'Single', character: key, children: [] })
+          const index = this.parent.children.indexOf(this)
+          this.parent.insertChild(newScope, index + 1) // 親スコープに新しい子要素を追加
+          return
+        } else if (this.parent) {
+          // 自身が積スコープとなる
+          this.type = 'Product'
+          this.setChildren([
+            new Scope({ type: 'Single', character: this.character, children: [] }),
+            new Scope({ type: 'Single', character: key, children: [] }),
+          ])
+          this.character = undefined
+          return
+        }
+      }
+    }
   }
 }

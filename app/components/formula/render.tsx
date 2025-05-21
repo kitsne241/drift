@@ -18,6 +18,7 @@ export default function Render() {
     display: 'none',
   })
   const [selectedScope, setSelectedScope] = useState<Scope | null>(null)
+  const [updateCounter, setUpdateCounter] = useState(0) // 再レンダリングのためのカウンター追加
 
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartPoint, setDragStartPoint] = useState<DOMPoint | null>(null)
@@ -37,7 +38,7 @@ export default function Render() {
     const resizeObserver = new ResizeObserver(() => setTimeout(reLoad, 10))
     resizeObserver.observe(mathRef.current)
     return () => resizeObserver.disconnect()
-  }, [scope])
+  }, [scope, updateCounter])
 
   // 枠外のクリックでハイライトを消す
   useEffect(() => {
@@ -68,12 +69,14 @@ export default function Render() {
           setIsDragging(false)
           setDragStartPoint(null)
         }
+
+        setUpdateCounter((prev) => prev + 1)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedScope])
+  }, [selectedScope, updateCounter])
 
   const reLoad = () => {
     if (!mathRef.current) return
@@ -89,6 +92,22 @@ export default function Render() {
       containerRef.current.style.width = `${scope.rect.width + 12}px`
       containerRef.current.style.height = `${scope.rect.height + 12}px`
       containerRef.current.style.position = 'relative'
+    }
+
+    // 選択中のスコープがある場合、ハイライトを更新
+    if (selectedScope) {
+      const selectedRect = selectedScope.getRect()
+      if (selectedRect) {
+        setHighlightStyle({
+          display: 'block',
+          left: `${selectedRect.x}px`,
+          top: `${selectedRect.y}px`,
+          width: `${selectedRect.width}px`,
+          height: `${selectedRect.height}px`,
+        })
+      } else {
+        setHighlightStyle({ display: 'none' })
+      }
     }
   }
 
@@ -128,10 +147,10 @@ export default function Render() {
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={() => setIsDragging(false)}
-      className='highlighter flex items-center justify-center relative'
+      className='flex items-center justify-center relative'
     >
       <div ref={highlightRef} className='formula-highlight-element' style={highlightStyle} />
-      <div ref={mathRef} className='z-[1] select-none'></div>
+      <div ref={mathRef} className='z-[1] select-none text-2xl'></div>
     </div>
   )
 }

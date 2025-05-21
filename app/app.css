@@ -27,14 +27,21 @@ button {
 
 /* デバッグ用 */
 .highlighter {
-  @apply border-1 border-black dark:border-white;
+  /* @apply border-1 border-black dark:border-white; */
+  outline:1px solid white;
 }
 
 /* 数式ハイライト用 */
 .formula-highlight-element {
   box-sizing: border-box;
   position: fixed;
-  background-color: rgba(255, 128, 0, 0.2);
+  background-color: rgba(255, 127, 0, 0.2);
   border-radius: 1px;
   pointer-events: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .formula-highlight-element {
+    background-color: rgba(0, 255, 0, 0.1);
+  }
 }
