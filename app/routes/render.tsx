@@ -2,7 +2,7 @@ import 'katex/dist/katex.min.css'
 import katex from 'katex'
 import { useEffect, useRef, useState } from 'react'
 import { getWholeStruct, structIndent } from '~/lib/html-struct'
-import { matchScope, makeLaTeX } from '~/lib/scope'
+import { reLink, getRect, genCode, createElementFromRect } from '~/lib/scope'
 import { sampleScope } from '~/lib/sample-data'
 
 export function meta() {
@@ -11,61 +11,60 @@ export function meta() {
 
 export default function Render() {
   const mathRef = useRef<HTMLDivElement>(null)
-  const [latex, setLatex] = useState(makeLaTeX(sampleScope))
+  const [scope, setScope] = useState(sampleScope)
+
+  // const [code, setCode] = useState(genCode(sampleScope))
 
   useEffect(() => {
-    if (mathRef.current) {
-      try {
-        const html = katex.renderToString(latex, {
-          output: 'html',
-          throwOnError: false,
-          displayMode: true,
-          macros: {
-            '\\log': '\\mathop{\\mathrm{log}}',
-          },
-        })
+    if (!mathRef.current) return
 
-        mathRef.current.innerHTML = html
-      } catch (error) {
-        console.error('KaTeX rendering error:', error)
-      }
+    try {
+      const html = katex.renderToString(genCode(scope), {
+        output: 'html',
+        throwOnError: true,
+        displayMode: true,
+        macros: {
+          '\\log': '\\mathop{\\mathrm{log}}',
+        },
+      })
 
-      setTimeout(() => {
-        if (mathRef.current) {
-          const struct = getWholeStruct(mathRef.current)
-          console.log(structIndent(struct))
-          console.log(matchScope(struct, sampleScope))
-        }
-      }, 0)
+      mathRef.current.innerHTML = html
+    } catch (error) {
+      console.error('KaTeX rendering error:', error)
     }
-  }, [latex])
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLatex(e.target.value)
+    // もう少しよい方法があればあとで置き換える
+    const resizeObserver = new ResizeObserver(() => setTimeout(reLoad, 10))
+    resizeObserver.observe(mathRef.current)
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [scope])
+
+  const reLoad = () => {
+    if (!mathRef.current) return
+
+    const struct = getWholeStruct(mathRef.current)
+    console.log(structIndent(struct)) // 単なるログ
+
+    reLink(struct, scope) // 生成された struct をもとに scope の末端に DOMRect を設定
+    getRect(scope) // 葉をもとに再帰的に Rect を設定
+
+    if (scope.Rect) {
+      const existingOverlays = document.querySelectorAll('.drift-overlay')
+      existingOverlays.forEach((el) => el.remove())
+
+      const overlayElement = createElementFromRect(scope.Rect, 'div')
+      overlayElement.classList.add('drift-overlay')
+      // 作成した要素をDOMにマウント
+      document.body.appendChild(overlayElement)
+    }
   }
 
   return (
     <div className='w-screen h-screen flex flex-col items-center justify-center'>
-      <style>{`
-        .drift-scope {
-          outline: 0.1px solid green;
-        }
-      `}</style>
       <div ref={mathRef}></div>
-      <input
-        type='text'
-        value={latex}
-        onChange={handleInputChange}
-        placeholder=''
-        style={{ textAlign: 'center', fontFamily: 'M PLUS Code Latin' }}
-        className='w-full'
-      />
     </div>
   )
 }
-
-// 1. 初期状態は何もないとする
-
-// 2. クリックされた位置にある記号を取得（数式の木構造の葉の位置から総当たり）し、入力が可能な状態にする
-// 3. 入力を受けて木構造を更新し、それに合わせて LaTeX 式を更新、DOM 構造も更新する
-// 4. 全体的に DOM 構造が書き変わってしまうので、前の構造と後の構造を比較して現在入力中の位置を再度特定する

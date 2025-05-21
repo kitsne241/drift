@@ -2,7 +2,7 @@
 // とりあえず和スコープ・積スコープ・分数まで
 
 // 子要素を Struct と同様のルールで階層化する
-const getLinearChildren = (me: Scope) => {
+const getLinearChildren = (me: Scope): Scope[] => {
   const linear: Scope[] = []
 
   if (me.Type == 'Sum' || me.Type == 'Product') {
@@ -23,8 +23,8 @@ const getLinearChildren = (me: Scope) => {
   return linear
 }
 
-// struct と scope が対応する構造を持つか確認する
-export const matchScope = (struct: Struct, scope: Scope): DOMRect => {
+// struct と scope が同じ構造を持つことを確認し、葉要素を対応付ける
+export const reLink = (struct: Struct, scope: Scope): void => {
   switch (scope.Type) {
     case 'Sum':
       if (struct.Type != 'Linear') {
@@ -58,9 +58,7 @@ export const matchScope = (struct: Struct, scope: Scope): DOMRect => {
       console.error('スコープと構造の葉同士の文字が一致しません', struct, scope)
       throw new Error('スコープと構造の葉同士の文字が一致しません')
     } else {
-      scope.Rect = struct.Element.getBoundingClientRect()
-      struct.Element.classList.add('drift-scope')
-      return scope.Rect
+      scope.Rect = struct.Element.getBoundingClientRect() // この関数の本質部分
     }
   }
 
@@ -73,49 +71,57 @@ export const matchScope = (struct: Struct, scope: Scope): DOMRect => {
     throw new Error('スコープと構造の子要素の数が一致しません')
   }
 
-  // 初期値を設定
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
+  for (let i = 0; i < struct.Children.length; i++) {
+    reLink(struct.Children[i], scopeChildren[i])
+  }
+}
 
-  // 各子要素の DOMRect を取得し、範囲を更新
-  for (let i = 0; i < scopeChildren.length; i++) {
-    const childRect = matchScope(struct.Children[i], scopeChildren[i])
-    if (childRect) {
-      minX = Math.min(minX, childRect.left)
-      minY = Math.min(minY, childRect.top)
-      maxX = Math.max(maxX, childRect.right)
-      maxY = Math.max(maxY, childRect.bottom)
-    }
+// 一番上の要素から再帰的に描画領域を取得
+export const getRect = (scope: Scope): DOMRect => {
+  if (scope.Rect && !scope.Type) return scope.Rect // 葉要素なのでそのまま Rect を返す
+
+  let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity]
+  for (const child of scope.Children) {
+    const childRect = getRect(child)
+    minX = Math.min(minX, childRect.left)
+    minY = Math.min(minY, childRect.top)
+    maxX = Math.max(maxX, childRect.right)
+    maxY = Math.max(maxY, childRect.bottom)
   }
 
-  // 全ての子要素を包む DOMRect を作成
-  if (minX !== Infinity) {
-    const width = maxX - minX
-    const height = maxY - minY
-    scope.Rect = new DOMRect(minX, minY, width, height)
-    struct.Element.classList.add('drift-scope')
-    return scope.Rect
-  }
-
-  // 子要素がない場合の対応
-  return new DOMRect(0, 0, 0, 0)
+  scope.Rect = new DOMRect(minX, minY, maxX - minX, maxY - minY)
+  return scope.Rect
 }
 
 // scope から LaTeX 式を生成
-export const makeLaTeX = (scope: Scope): string => {
+export const genCode = (scope: Scope): string => {
   switch (scope.Type) {
     case 'Sum':
-      return scope.Children.map(makeLaTeX).join(' ')
+      return scope.Children.map(genCode).join(' ')
 
     case 'Product':
-      return scope.Children.map(makeLaTeX).join(' ')
+      return scope.Children.map(genCode).join(' ')
 
     case 'Frac':
-      return '\\frac{' + scope.Children.map(makeLaTeX).join('}{') + '}'
+      return '\\frac{' + scope.Children.map(genCode).join('}{') + '}'
 
     default:
       return scope.Character || ''
   }
+}
+
+export const createElementFromRect = (rect: DOMRect, tagName: string = 'div') => {
+  const element = document.createElement(tagName)
+
+  // 絶対配置で位置とサイズを設定
+  element.style.position = 'absolute'
+  element.style.left = `${rect.left}px`
+  element.style.top = `${rect.top}px`
+  element.style.width = `${rect.width}px`
+  element.style.height = `${rect.height}px`
+
+  // 半透明の青色を設定
+  element.style.backgroundColor = 'rgba(0, 0, 255, 0.3)' // 青色で30%の不透明度
+
+  return element
 }
