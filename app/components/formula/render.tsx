@@ -1,9 +1,9 @@
 import 'katex/dist/katex.min.css'
 import katex from 'katex'
 import { useEffect, useRef, useState } from 'react'
-import { getWholeStruct, structIndent } from '~/lib/html-struct'
-import { reLink, getRect, genCode, selectScope } from '~/lib/scope'
-import { sampleScope } from '~/lib/sample-data'
+import { getWholeStruct, structIndent } from '~/lib/struct'
+import { Scope } from '~/lib/scope'
+import { sampleScopeData } from '~/lib/sample-data'
 
 export function meta() {
   return [{ title: 'Drift' }, { name: 'description', content: 'KaTeX表示' }]
@@ -13,18 +13,20 @@ export default function Render() {
   const mathRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const highlightRef = useRef<HTMLDivElement>(null)
-  const [scope, setScope] = useState(sampleScope)
+  const [scope, setScope] = useState(new Scope(sampleScopeData))
   const [highlightStyle, setHighlightStyle] = useState<React.CSSProperties>({
     display: 'none',
   })
+  const [selectedScope, setSelectedScope] = useState<Scope | null>(null)
 
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartPoint, setDragStartPoint] = useState<DOMPoint | null>(null)
 
+  // scope の変更に伴い KaTeX を再描画
   useEffect(() => {
     if (!mathRef.current) return
 
-    const html = katex.renderToString(genCode(scope), {
+    const html = katex.renderToString(scope.toCode(), {
       output: 'html',
       throwOnError: true,
       displayMode: true,
@@ -37,14 +39,50 @@ export default function Render() {
     return () => resizeObserver.disconnect()
   }, [scope])
 
+  // 枠外のクリックでハイライトを消す
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setHighlightStyle({ display: 'none' })
+        setIsDragging(false)
+        setDragStartPoint(null)
+      }
+    }
+
+    window.addEventListener('mousedown', handleOutsideClick)
+    return () => window.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
+
+  // 選択中にキー入力があった場合の処理
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (selectedScope) {
+        console.log('キー入力:', event.key, '選択中のスコープを更新')
+        // Shift + - を打つと、Shift → = の入力がある
+
+        selectedScope.edit(event.key)
+
+        if (event.key === 'Escape') {
+          setSelectedScope(null)
+          setHighlightStyle({ display: 'none' })
+          setIsDragging(false)
+          setDragStartPoint(null)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedScope])
+
   const reLoad = () => {
     if (!mathRef.current) return
 
     const struct = getWholeStruct(mathRef.current)
     console.log(structIndent(struct)) // 単なるログ
 
-    reLink(struct, scope)
-    getRect(scope)
+    scope.reLink(struct)
+    scope.getRect()
 
     // ここでcontainerRefのサイズをscope.rectに合わせる
     if (scope.rect && containerRef.current) {
@@ -67,10 +105,9 @@ export default function Render() {
     updateSelectionHighlight(dragStartPoint, currentPoint)
   }
 
-  // 選択範囲のハイライト更新
   const updateSelectionHighlight = (start: DOMPoint, end: DOMPoint) => {
-    const selectedScope = selectScope(start, end, scope)
-
+    // console.log(scope.select(start, end))
+    setSelectedScope(scope.select(start, end))
     if (!selectedScope || !selectedScope.rect) {
       setHighlightStyle({ display: 'none' })
       return

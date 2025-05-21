@@ -1,6 +1,14 @@
 // KaTeX の HTMLElement から構造と座標を抽出する
 // 中間層に大量の位置合わせの span が挟まっているので、それらを外してシンプルな階層を得る
 
+// HTML の構造を抽出した構造。ほぼ LaTeX 記法に対応
+export type Struct = {
+  element: HTMLElement
+  children: Struct[]
+  type: 'Single' | 'Linear' | 'Frac' // Linear は普通に並んでいる記号、Frac は分数
+  character?: string // 最下層のみ文字記号の情報をもつ
+}
+
 // 呼ばれる関数
 export const getWholeStruct = (display: HTMLElement) => {
   return getStruct(getDescendants(display, 3)[0] as HTMLElement)
@@ -39,8 +47,9 @@ const getStruct = (me: HTMLElement): Struct => {
     return {
       element: me,
       children: [] as Struct[],
+      type: 'Single',
       character: me.textContent?.trim() || '',
-    } as Struct
+    }
   }
 
   // その要素が分数である場合
@@ -49,8 +58,8 @@ const getStruct = (me: HTMLElement): Struct => {
       element: me,
       children: fracStruct(me),
       type: 'Frac',
-      Character: me.textContent?.trim() || '',
-    } as Struct
+      character: me.textContent?.trim() || '',
+    }
   }
 
   // その要素が単なる記号である場合
@@ -68,7 +77,7 @@ const getStruct = (me: HTMLElement): Struct => {
     element: me,
     children: children,
     type: 'Linear',
-  } as Struct
+  }
 }
 
 // 分数の Struct を取得
