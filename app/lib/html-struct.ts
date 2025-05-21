@@ -37,18 +37,18 @@ const getStruct = (me: HTMLElement): Struct => {
   // その要素が最下層である場合
   if (childElems.length == 0) {
     return {
-      Element: me,
-      Children: [] as Struct[],
-      Character: me.textContent?.trim() || '',
+      element: me,
+      children: [] as Struct[],
+      character: me.textContent?.trim() || '',
     } as Struct
   }
 
   // その要素が分数である場合
   if (childElems.length > 2 && childElems[1].className.split(' ').includes('mfrac')) {
     return {
-      Element: me,
-      Children: fracStruct(me),
-      Type: 'Frac',
+      element: me,
+      children: fracStruct(me),
+      type: 'Frac',
       Character: me.textContent?.trim() || '',
     } as Struct
   }
@@ -65,9 +65,9 @@ const getStruct = (me: HTMLElement): Struct => {
   }
 
   return {
-    Element: me,
-    Children: children,
-    Type: 'Linear',
+    element: me,
+    children: children,
+    type: 'Linear',
   } as Struct
 }
 
@@ -97,9 +97,9 @@ const getDescendants = (me: HTMLElement, gens: number) => {
 export const structIndent = (scope: Struct, indent: number = 0) => {
   let text =
     '    '.repeat(indent) +
-    scope.Element.className +
-    (scope.Character ? ' / ' + scope.Character : '')
-  for (const child of scope.Children) {
+    scope.element.className +
+    (scope.character ? ' / ' + scope.character : '')
+  for (const child of scope.children) {
     text += '\n' + structIndent(child, indent + 1)
   }
   return text

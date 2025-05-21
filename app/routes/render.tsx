@@ -23,9 +23,6 @@ export default function Render() {
         output: 'html',
         throwOnError: true,
         displayMode: true,
-        macros: {
-          '\\log': '\\mathop{\\mathrm{log}}',
-        },
       })
 
       mathRef.current.innerHTML = html
@@ -33,13 +30,9 @@ export default function Render() {
       console.error('KaTeX rendering error:', error)
     }
 
-    // もう少しよい方法があればあとで置き換える
     const resizeObserver = new ResizeObserver(() => setTimeout(reLoad, 10))
     resizeObserver.observe(mathRef.current)
-
-    return () => {
-      resizeObserver.disconnect()
-    }
+    return () => resizeObserver.disconnect()
   }, [scope])
 
   const reLoad = () => {
@@ -47,15 +40,13 @@ export default function Render() {
 
     const struct = getWholeStruct(mathRef.current)
     console.log(structIndent(struct)) // 単なるログ
+    reLink(struct, scope)
+    getRect(scope)
 
-    reLink(struct, scope) // 生成された struct をもとに scope の末端に DOMRect を設定
-    getRect(scope) // 葉をもとに再帰的に Rect を設定
-
-    if (scope.Rect) {
+    if (scope.rect) {
       const existingOverlays = document.querySelectorAll('.drift-overlay')
       existingOverlays.forEach((el) => el.remove())
-
-      const overlayElement = createElementFromRect(scope.Rect, 'div')
+      const overlayElement = createElementFromRect(scope.rect, 'div')
       overlayElement.classList.add('drift-overlay')
       // 作成した要素をDOMにマウント
       document.body.appendChild(overlayElement)

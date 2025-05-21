@@ -5,9 +5,9 @@
 const getLinearChildren = (me: Scope): Scope[] => {
   const linear: Scope[] = []
 
-  if (me.Type == 'Sum' || me.Type == 'Product') {
-    for (const child of me.Children) {
-      if (child.Type == 'Sum' || child.Type == 'Product') {
+  if (me.type == 'Sum' || me.type == 'Product') {
+    for (const child of me.children) {
+      if (child.type == 'Sum' || child.type == 'Product') {
         // もし子要素が和スコープ・積スコープであれば、さらにその子要素を取得する
         const linearChildren = getLinearChildren(child)
         linear.push(...linearChildren)
@@ -16,7 +16,7 @@ const getLinearChildren = (me: Scope): Scope[] => {
       }
     }
   } else {
-    for (const child of me.Children) {
+    for (const child of me.children) {
       linear.push(child)
     }
   }
@@ -25,27 +25,27 @@ const getLinearChildren = (me: Scope): Scope[] => {
 
 // struct と scope が同じ構造を持つことを確認し、葉要素を対応付ける
 export const reLink = (struct: Struct, scope: Scope): void => {
-  switch (scope.Type) {
+  switch (scope.type) {
     case 'Sum':
-      if (struct.Type != 'Linear') {
+      if (struct.type != 'Linear') {
         console.error('Sum スコープに Linear 以外の構造が対応しています', struct, scope)
         throw new Error('Sum スコープに Linear 以外の構造が対応しています')
       }
       break
     case 'Product':
-      if (struct.Type != 'Linear') {
+      if (struct.type != 'Linear') {
         console.error('Product スコープに Linear 以外の構造が対応しています', struct, scope)
         throw new Error('Product スコープに Linear 以外の構造が対応しています')
       }
       break
     case 'Frac':
-      if (struct.Type != 'Frac') {
+      if (struct.type != 'Frac') {
         console.error('Fraac スコープに Frac 以外の構造が対応しています', struct, scope)
         throw new Error('Frac スコープに Frac 以外の構造が対応しています')
       }
       break
     case undefined:
-      if (struct.Type != undefined) {
+      if (struct.type != undefined) {
         console.error('スコープの葉に葉でない構造が対応しています', struct, scope)
         throw new Error('スコープの葉に葉でない構造が対応しています')
       }
@@ -53,12 +53,12 @@ export const reLink = (struct: Struct, scope: Scope): void => {
   }
 
   // それぞれが葉である場合、Character を比較して一致するか確認
-  if (!struct.Type && !scope.Type) {
-    if (struct.Character != scope.Character) {
+  if (!struct.type && !scope.type) {
+    if (struct.character != scope.character) {
       console.error('スコープと構造の葉同士の文字が一致しません', struct, scope)
       throw new Error('スコープと構造の葉同士の文字が一致しません')
     } else {
-      scope.Rect = struct.Element.getBoundingClientRect() // この関数の本質部分
+      scope.rect = struct.element.getBoundingClientRect() // この関数の本質部分
     }
   }
 
@@ -66,22 +66,22 @@ export const reLink = (struct: Struct, scope: Scope): void => {
 
   console.log(scopeChildren)
 
-  if (struct.Children.length != scopeChildren.length) {
+  if (struct.children.length != scopeChildren.length) {
     console.error('スコープと構造の子要素の数が一致しません', struct, scopeChildren)
     throw new Error('スコープと構造の子要素の数が一致しません')
   }
 
-  for (let i = 0; i < struct.Children.length; i++) {
-    reLink(struct.Children[i], scopeChildren[i])
+  for (let i = 0; i < struct.children.length; i++) {
+    reLink(struct.children[i], scopeChildren[i])
   }
 }
 
 // 一番上の要素から再帰的に描画領域を取得
 export const getRect = (scope: Scope): DOMRect => {
-  if (scope.Rect && !scope.Type) return scope.Rect // 葉要素なのでそのまま Rect を返す
+  if (scope.rect && !scope.type) return scope.rect // 葉要素なのでそのまま Rect を返す
 
   let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity]
-  for (const child of scope.Children) {
+  for (const child of scope.children) {
     const childRect = getRect(child)
     minX = Math.min(minX, childRect.left)
     minY = Math.min(minY, childRect.top)
@@ -89,24 +89,24 @@ export const getRect = (scope: Scope): DOMRect => {
     maxY = Math.max(maxY, childRect.bottom)
   }
 
-  scope.Rect = new DOMRect(minX, minY, maxX - minX, maxY - minY)
-  return scope.Rect
+  scope.rect = new DOMRect(minX, minY, maxX - minX, maxY - minY)
+  return scope.rect
 }
 
 // scope から LaTeX 式を生成
 export const genCode = (scope: Scope): string => {
-  switch (scope.Type) {
+  switch (scope.type) {
     case 'Sum':
-      return scope.Children.map(genCode).join(' ')
+      return scope.children.map(genCode).join(' ')
 
     case 'Product':
-      return scope.Children.map(genCode).join(' ')
+      return scope.children.map(genCode).join(' ')
 
     case 'Frac':
-      return '\\frac{' + scope.Children.map(genCode).join('}{') + '}'
+      return '\\frac{' + scope.children.map(genCode).join('}{') + '}'
 
     default:
-      return scope.Character || ''
+      return scope.character || ''
   }
 }
 

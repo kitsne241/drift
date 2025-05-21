@@ -1,48 +1,48 @@
 export const sampleScope: Scope = {
-  Type: 'Sum',
-  Children: [
+  type: 'Sum',
+  children: [
     {
-      Type: 'Frac',
-      Children: [
+      type: 'Frac',
+      children: [
         {
-          Type: 'Sum',
-          Children: [
+          type: 'Sum',
+          children: [
             {
-              Type: 'Product',
-              Children: [
+              type: 'Product',
+              children: [
                 {
-                  Character: '2',
-                  Children: [],
+                  character: '2',
+                  children: [],
                 },
                 {
-                  Character: 'a',
-                  Children: [],
+                  character: 'a',
+                  children: [],
                 },
               ],
             },
             {
-              Character: '+',
-              Children: [],
+              character: '+',
+              children: [],
             },
             {
-              Character: '3',
-              Children: [],
+              character: '3',
+              children: [],
             },
           ],
         },
         {
-          Character: '5',
-          Children: [],
+          character: '5',
+          children: [],
         },
       ],
     },
     {
-      Character: '=',
-      Children: [],
+      character: '=',
+      children: [],
     },
     {
-      Character: '1',
-      Children: [],
+      character: '1',
+      children: [],
     },
   ],
 }
