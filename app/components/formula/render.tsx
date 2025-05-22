@@ -47,6 +47,24 @@ export default function Render() {
       if (!mathRef.current) return
       rootScope.current.reLink(getWholeStruct(mathRef.current))
       rootScope.current.getRect()
+
+      // 位置計算が終わった後でカーソル位置を更新する
+      if (cursorRef.current && inputScope && inputScope.rect) {
+        cursorRef.current.style.display = 'block'
+        cursorRef.current.style.position = 'fixed'
+        cursorRef.current.style.left = `${inputScope.rect.x}px`
+        cursorRef.current.style.top = `${inputScope.rect.y}px`
+        cursorRef.current.style.height = `${inputScope.rect.height}px`
+        cursorRef.current.style.width = '1px'
+        cursorRef.current.style.backgroundColor = 'rgba(255, 127, 0, 1)'
+
+        // カーソル点滅のためのクラスを追加
+        cursorRef.current.classList.add('cursor-blink')
+      } else if (cursorRef.current) {
+        // 入力モードでない場合はカーソルを非表示
+        cursorRef.current.style.display = 'none'
+        cursorRef.current.classList.remove('cursor-blink')
+      }
     }, 100)
   }, [updateCounter])
 
@@ -187,7 +205,7 @@ export default function Render() {
   )
 
   // 入力の管理
-  useDeepCompareEffect(() => {
+  useEffect(() => {
     window.addEventListener('mousedown', handleMouseDown)
     window.addEventListener('keydown', handleKeyDown)
     return () => {
@@ -242,30 +260,8 @@ export default function Render() {
       style.height = `${selectedScope.rect.height + 4}px`
     }
   }, [selectedScope, inputScope])
-
-  // cursorRef の位置とスタイルを更新
-  useDeepCompareEffect(() => {
-    if (!cursorRef.current) return
-
-    if (inputScope === null) {
-      cursorRef.current.style.display = 'none'
-      return
-    }
-
-    console.log('hello')
-
-    if (inputScope?.rect !== undefined) {
-      cursorRef.current.style.display = 'block'
-      cursorRef.current.style.position = 'fixed'
-      cursorRef.current.style.left = `${inputScope.rect.x}px`
-      cursorRef.current.style.top = `${inputScope.rect.y}px`
-      cursorRef.current.style.height = `${inputScope.rect.height}px`
-      cursorRef.current.style.width = '1px'
-      cursorRef.current.style.backgroundColor = 'rgba(255, 127, 0, 1)'
-    }
-
-    console.log(cursorRef.current.style.display)
-  }, [inputScope?.rect])
+  // ドラッグ中に selectedScope の参照が変わるたびに走る
+  // 選択範囲に操作が加えられて inputScope が新しく生成されても走る
 
   return (
     <div
