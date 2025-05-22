@@ -96,10 +96,10 @@ export class Scope {
   getLinearChildren(): Scope[] {
     const linear: Scope[] = []
 
-    if (this.type == 'Sum' || this.type == 'Product') {
+    if (this.type === 'Sum' || this.type === 'Product') {
       // 和スコープ・積スコープの場合は、子要素を均して取得する必要がある
       for (const child of this.children) {
-        if (child.type == 'Sum' || child.type == 'Product') {
+        if (child.type === 'Sum' || child.type === 'Product') {
           // もし子要素が和スコープ・積スコープであれば、さらにその子要素を取得する
           const linearChildren = child.getLinearChildren()
           linear.push(...linearChildren)
@@ -146,7 +146,7 @@ export class Scope {
     }
 
     // それぞれが葉である場合、Character を比較して一致するか確認
-    if (struct.type == 'Single' && this.type == 'Single') {
+    if (struct.type === 'Single' && this.type === 'Single') {
       if (struct.character != this.character) {
         console.error('スコープと構造の葉同士の文字が一致しません', struct, this)
         throw new Error('スコープと構造の葉同士の文字が一致しません')
@@ -171,7 +171,7 @@ export class Scope {
 
   // 葉の要素から再帰的に描画領域を取得
   getRect(): DOMRect {
-    if (this.rect && this.type == 'Single') return this.rect // 葉要素なのでそのまま Rect を返す
+    if (this.rect && this.type === 'Single') return this.rect // 葉要素なのでそのまま Rect を返す
 
     let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity]
     for (const child of this.children) {
@@ -202,17 +202,12 @@ export class Scope {
 
   // スコープの編集
   edit(key: string) {
-    if (key == 'Backspace') {
-      this.parent?.removeChild(this)
-      return
-    }
-
     // scope が葉である場合
-    if (this.type == 'Single') {
+    if (this.type === 'Single') {
       // key が a ~ z、A ~ Z、0 ~ 9 の文字である場合
       if (/^[a-zA-Z0-9]$/.test(key)) {
         // 親スコープが積スコープである場合
-        if (this.parent?.type == 'Product') {
+        if (this.parent?.type === 'Product') {
           // 親スコープに子要素を追加
           const newScope = new Scope({ type: 'Single', character: key, children: [] })
           const index = this.parent.children.indexOf(this)

@@ -3,7 +3,7 @@
 
 const getChildElems = (element: HTMLElement) => {
   const childElems: HTMLElement[] = []
-  if (element.className == 'katex-html') {
+  if (element.className === 'katex-html') {
     // 最上層の要素 katex-html でこれを実行した場合のみ base を飛ばして 2 層下にあるものを得る
     const children = Array.from(element.children) as HTMLElement[]
     for (const child of children) {
@@ -31,7 +31,7 @@ export const getStruct = (me: HTMLElement) => {
   const childElems = getChildElems(me)
 
   // その要素が最下層である場合
-  if (childElems.length == 0) {
+  if (childElems.length === 0) {
     return {
       Element: me,
       Children: [] as Struct[],

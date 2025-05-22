@@ -38,12 +38,12 @@ const getStruct = (me: HTMLElement): Struct => {
   const childElems = getChildElems(me)
 
   // その要素が 1 つしか子を含まない場合
-  if (childElems.length == 1) {
+  if (childElems.length === 1) {
     return getStruct(childElems[0])
   }
 
   // その要素が最下層である場合
-  if (childElems.length == 0) {
+  if (childElems.length === 0) {
     return {
       element: me,
       children: [] as Struct[],
