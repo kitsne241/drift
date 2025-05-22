@@ -21,7 +21,14 @@ export class Scope {
   rect?: DOMRect
 
   // scope を ScopeData から生成
-  constructor(data: ScopeData, parent: Scope | null = null) {
+  constructor(data?: ScopeData, parent: Scope | null = null) {
+    if (!data) {
+      this.type = 'Single'
+      this.character = ''
+      this.parent = parent
+      return
+    }
+
     this.type = data.type
     this.character = data.character
     this.parent = parent
@@ -63,6 +70,7 @@ export class Scope {
 
   // scope に child を挿入
   insertChild(child: Scope, index: number) {
+    if (index < 0) index = this.children.length + index // 負のインデックスを許可
     child.parent = this
     this.children.splice(index, 0, child)
     return child // parent を反映させた child を返す

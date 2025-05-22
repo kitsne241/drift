@@ -1,38 +1,40 @@
 import 'katex/dist/katex.min.css'
 import katex from 'katex'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getWholeStruct, structIndent } from '~/lib/struct'
 import { Scope } from '~/lib/scope'
 import { sampleScopeData } from '~/lib/sample-data'
+import { useDeepCompareEffect, useDeepCompareMemo } from 'use-deep-compare'
 
 export function meta() {
   return [{ title: 'Drift' }, { name: 'description', content: 'KaTeX表示' }]
 }
 
 export default function Render() {
-  const mathRef = useRef<HTMLDivElement>(null)
+  // 数式表示のための Ref
   const containerRef = useRef<HTMLDivElement>(null)
+  const mathRef = useRef<HTMLDivElement>(null)
   const highlightRef = useRef<HTMLDivElement>(null)
-  const cursorRef = useRef<HTMLDivElement>(null) // カーソル表示用のrefを追加
+  const cursorRef = useRef<HTMLDivElement>(null)
 
-  const [rootScope, setRootScope] = useState(new Scope(sampleScopeData))
+  // 数式の Scope を管理する状態
+  const rootScope = useRef(new Scope(sampleScopeData))
   const [selectedScope, setSelectedScope] = useState<Scope | null>(null)
-  // 選択されたスコープ。そのまま入力中のスコープとして機能する
-
   const [inputScope, setInputScope] = useState<Scope | null>(null)
-  // 入力をする位置の指標として機能する空の Scope。selectedScope の子供
-  // 数式そのものをいじらず、入力する位置を変えるごとに rootScope を更新する
 
-  const [updateCounter, setUpdateCounter] = useState(0) // 再レンダリングのためのカウンター追加
+  // ひとまず選択するスコープは単一のものとする。将来的に和スコープの中の複数要素なども考えてはいる
+  // 入力中、inputScope は常に空の葉スコープ。selectedScope の子供
 
-  const [isDragging, setIsDragging] = useState(false)
   const [dragStartPoint, setDragStartPoint] = useState<DOMPoint | null>(null)
+  // null のとき、ドラッグ中ではない
 
-  // scope の変更に伴い KaTeX を再描画
+  const [updateCounter, setUpdateCounter] = useState(0) // 再レンダリングのためのカウンター
+
+  // rootScope の変更に伴い KaTeX を再描画
   useEffect(() => {
     if (!mathRef.current) return
 
-    const html = katex.renderToString(rootScope.toCode(), {
+    const html = katex.renderToString(rootScope.current.toCode(), {
       output: 'html',
       throwOnError: true,
       displayMode: true,
@@ -40,262 +42,241 @@ export default function Render() {
 
     mathRef.current.innerHTML = html
 
-    // リサイズ検知のフラグを追加して無限ループを防止
-    let isHandlingResize = false
-    const resizeObserver = new ResizeObserver(() => {
-      if (!isHandlingResize) {
-        isHandlingResize = true
-        setTimeout(() => {
-          reLoad()
-          isHandlingResize = false
-        }, 10)
-      }
-    })
+    // HTML の安定を待ってから mathRef を rootScope にリンク
+    setTimeout(() => {
+      if (!mathRef.current) return
+      rootScope.current.reLink(getWholeStruct(mathRef.current))
+      rootScope.current.getRect()
+    }, 100)
+  }, [updateCounter])
 
-    resizeObserver.observe(mathRef.current)
-    return () => resizeObserver.disconnect()
-  }, [rootScope, updateCounter])
-
-  const updateSelectionHighlight = useCallback(
-    (start: DOMPoint, end: DOMPoint) => {
-      setSelectedScope(rootScope.select(start, end))
-    },
-    [rootScope]
-  )
-
-  // 枠外のクリックとコンテナ内クリックを統合
-  useEffect(() => {
-    const handleGlobalMouseDown = (event: MouseEvent) => {
-      // コンテナ外のクリック処理
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        if (selectedScope && inputScope) {
-          selectedScope.removeChild(inputScope)
-        }
-        setSelectedScope(null)
-        setIsDragging(false)
-        setDragStartPoint(null)
-        setInputScope(null)
-        return
-      }
-
-      if (inputScope !== null) return
-      // コンテナ内のクリック処理（handleMouseDownの内容）
-      const point = new DOMPoint(event.clientX, event.clientY)
-      setIsDragging(true)
-      setDragStartPoint(point)
-      updateSelectionHighlight(point, point)
-    }
-
-    window.addEventListener('mousedown', handleGlobalMouseDown)
-    return () => window.removeEventListener('mousedown', handleGlobalMouseDown)
-  }, [updateSelectionHighlight, inputScope])
-
-  // 選択中にキー入力があった場合の処理
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (selectedScope) {
-        console.log('キー入力:', event.key, '選択中のスコープを更新')
-        // Shift + - を打つと、Shift → = の入力がある
-
-        // selectedScope.edit(event.key)
-
-        // 選択しただけ（入力モードになっていない）の状態では
-        // 左右矢印・BackSpace・Enter・Esc のみを受け付け、いずれも選択しただけの状態を解消する
-
-        if (!inputScope) {
-          if (event.key === 'ArrowLeft') {
-            const index = selectedScope.parent?.children.indexOf(selectedScope) || 0
-            if (selectedScope.parent) {
-              setSelectedScope(() => selectedScope.parent)
-            }
-            setInputScope(() => new Scope({ type: 'Single', character: '', children: [] }))
-            selectedScope.insertChild(inputScope!, index)
-          }
-
-          if (event.key === 'ArrowRight') {
-            const index = selectedScope.parent?.children.indexOf(selectedScope) || 0
-            if (selectedScope.parent) {
-              setSelectedScope(() => selectedScope.parent)
-            }
-            setInputScope(() => new Scope({ type: 'Single', character: '', children: [] }))
-            selectedScope.insertChild(inputScope!, index + 1)
-          }
-
-          if (event.key === 'Enter') {
-            setInputScope(() => new Scope({ type: 'Single', character: '', children: [] }))
-            selectedScope.insertChild(inputScope!, 0)
-          }
-
-          if (event.key === 'Backspace') {
-            selectedScope.type = 'Single'
-            selectedScope.character = ''
-            selectedScope.children = []
-            setInputScope(selectedScope)
-            setSelectedScope(() => selectedScope.parent)
-          }
-
-          if (event.key === 'Escape') {
-            setSelectedScope(null)
-            setIsDragging(false)
-            setDragStartPoint(null)
-          }
-        } else {
-          if (event.key === 'ArrowLeft') {
-            const index = selectedScope.children.indexOf(inputScope) || 0
-            selectedScope.removeChild(inputScope)
-            selectedScope.insertChild(inputScope, Math.max(index - 1, 0))
-          }
-
-          if (event.key === 'ArrowRight') {
-            const index = selectedScope.children.indexOf(inputScope) || 0
-            selectedScope.removeChild(inputScope)
-            selectedScope.insertChild(
-              inputScope,
-              Math.min(index + 1, selectedScope.children.length)
-            )
-          }
-
-          selectedScope.edit(event.key)
-        }
-
-        setUpdateCounter((prev) => prev + 1)
-        event.preventDefault() // デフォルトの動作を防ぐ
-        event.stopPropagation() // イベントのバブリングを防ぐ
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [inputScope, selectedScope, updateCounter])
-
-  // inputScopeのカーソルスタイルを計算する関数
-  const getCursorStyle = (): React.CSSProperties => {
-    if (!selectedScope || !inputScope || !inputScope.rect) {
-      return { display: 'none' }
-    }
-
-    console.log('selectedScope.rect', selectedScope.rect)
-    console.log('selectedScope', selectedScope.children)
-    console.log('inputScope.rect', inputScope.rect)
-
-    return {
-      color: '#fff',
-      display: 'block',
-      left: `${inputScope.rect.x}px`,
-      top: `${inputScope.rect.y}px`,
-      height: `${inputScope.rect.height}px`,
-      width: '2px',
-      backgroundColor: '#000',
-      position: 'fixed',
-      animation: 'cursorBlink 1s step-end infinite', // グローバルCSSで定義したアニメーションを参照
-    }
+  const deSelect = () => {
+    if (selectedScope && inputScope) selectedScope.removeChild(inputScope)
+    setSelectedScope(null)
+    setInputScope(null)
+    setDragStartPoint(null)
   }
 
-  // selectedScope と inputIndex からハイライトスタイルを計算する関数
-  const getHighlightStyle = (): React.CSSProperties => {
-    if (!selectedScope || !selectedScope.rect) {
-      return { display: 'none' }
-    }
+  const handleMouseDown = useCallback(
+    (event: MouseEvent) => {
+      if (containerRef.current === null) return
 
-    if (inputScope !== null) {
+      if (containerRef.current.contains(event.target as Node)) {
+        if (inputScope !== null) return // 入力中はクリックを無視
+        // コンテナ内のクリック
+        const point = new DOMPoint(event.clientX, event.clientY)
+        setSelectedScope(rootScope.current.select(point, point))
+        setDragStartPoint(point)
+        return
+      } else deSelect() // コンテナ外をクリックした場合、すべての選択を解除
+    },
+    [selectedScope, inputScope, rootScope]
+  )
+
+  const handleMouseMove = useCallback(
+    (event: React.MouseEvent) => {
+      if (!dragStartPoint) return
+      const currentPoint = new DOMPoint(event.clientX, event.clientY)
+      setSelectedScope(rootScope.current.select(dragStartPoint, currentPoint))
+    },
+    [dragStartPoint, rootScope]
+  )
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (selectedScope === null) return // 選択されていない場合は何もしない
+      console.log(event.key)
+
+      if (inputScope === null) {
+        // 選択しただけ（入力モードになっていない）の状態では
+        // 左右矢印・BackSpace・Enter・Esc のみを受け付け、いずれも選択しただけの状態を解消する
+        const input = new Scope()
+
+        switch (event.key) {
+          case 'ArrowLeft': {
+            setInputScope(input)
+            if (selectedScope.parent === null) {
+              // ルートスコープの左矢印の場合は、左端にカーソルを挿入
+              selectedScope.insertChild(input, 0)
+            } else {
+              // 通常スコープの左矢印では、親スコープに移動して左隣にカーソルを挿入
+              const parent = selectedScope.parent
+              const index = parent.children.indexOf(selectedScope)
+              parent.insertChild(input, index)
+              setSelectedScope(parent)
+            }
+            break
+          }
+          case 'ArrowRight': {
+            setInputScope(input)
+            if (selectedScope.parent === null) {
+              // ルートスコープの右矢印の場合は、右端にカーソルを挿入
+              selectedScope.insertChild(input, -1)
+            } else {
+              // 通常スコープの左矢印では、親スコープに移動して右隣にカーソルを挿入
+              const parent = selectedScope.parent
+              const index = parent.children.indexOf(selectedScope)
+              parent.insertChild(input, index + 1)
+              setSelectedScope(parent)
+            }
+            break
+          }
+          case 'Enter': {
+            setInputScope(input)
+            selectedScope.insertChild(input, 0)
+            break
+          }
+          case 'Backspace': {
+            setInputScope(input)
+            if (selectedScope.parent === null) {
+              // ルートスコープの BackSpace の場合は、一旦すべてリセットしてカーソルを挿入
+              selectedScope.setChildren([input])
+            } else {
+              // 通常スコープの BackSpace の場合は、現在のスコープをカーソルに置き換える
+              const parent = selectedScope.parent
+              const index = parent.children.indexOf(selectedScope)
+              parent.removeChild(selectedScope)
+              parent.insertChild(input, index)
+              setSelectedScope(parent)
+            }
+            break
+          }
+          case 'Escape': {
+            deSelect()
+            break
+          }
+        }
+      } else {
+        switch (event.key) {
+          case 'ArrowLeft': {
+            const index = selectedScope.children.indexOf(inputScope)
+            if (index > 0) {
+              selectedScope.removeChild(inputScope)
+              selectedScope.insertChild(inputScope, index - 1)
+            }
+            break
+          }
+
+          case 'ArrowRight': {
+            const index = selectedScope.children.indexOf(inputScope)
+            if (index < selectedScope.children.length - 1) {
+              selectedScope.removeChild(inputScope)
+              selectedScope.insertChild(inputScope, index + 1)
+            }
+            break
+          }
+
+          case 'Backspace': {
+            const index = selectedScope.children.indexOf(inputScope)
+            if (index > 0) {
+              selectedScope.removeChild(selectedScope.children[index - 1])
+            }
+            break
+          }
+        }
+
+        // selectedScope.edit(event.key)
+      }
+
+      setUpdateCounter((prev) => prev + 1)
+      event.preventDefault() // デフォルトの動作を防ぐ
+      event.stopPropagation() // イベントのバブリングを防ぐ
+      console.log(selectedScope)
+    },
+    [selectedScope, inputScope, rootScope, setSelectedScope, setInputScope, setUpdateCounter]
+  )
+
+  // 入力の管理
+  useDeepCompareEffect(() => {
+    window.addEventListener('mousedown', handleMouseDown)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [handleMouseDown, handleKeyDown])
+
+  // 数式を囲むコンテナのサイズを計算
+  const containerStyle = useDeepCompareMemo((): React.CSSProperties => {
+    if (rootScope.current.rect) {
       return {
-        display: 'block',
-        left: `${selectedScope.rect.x - 4}px`,
-        top: `${selectedScope.rect.y - 2}px`,
-        width: `${selectedScope.rect.width + 8}px`,
-        height: `${selectedScope.rect.height + 4}px`,
+        width: `${rootScope.current.rect.width + 12}px`,
+        height: `${rootScope.current.rect.height + 12}px`,
+        position: 'relative',
       }
     } else {
       return {
-        display: 'block',
-        left: `${selectedScope.rect.x}px`,
-        top: `${selectedScope.rect.y}px`,
-        width: `${selectedScope.rect.width}px`,
-        height: `${selectedScope.rect.height}px`,
+        width: '0px',
+        height: '0px',
+        position: 'relative',
       }
     }
-  }
+  }, [rootScope.current.rect])
 
-  // inputScopeの位置情報を更新するための追加のuseEffect
-  useEffect(() => {
-    if (inputScope) {
-      inputScope.getRect() // inputScopeの位置情報を更新
-      setUpdateCounter((prev) => prev + 1) // 再レンダリングを強制
-    }
-  }, [inputScope])
-
-  // rootScope更新後にinputScopeの位置を再計算
-  useEffect(() => {
-    // updateCounterを依存配列から除外し、代わりに別のトリガーを使用
-    if (inputScope && rootScope) {
-      // 前回の位置情報を記憶する参照を作成
-      const prevRect = inputScope.rect ? { ...inputScope.rect } : null
-
-      setTimeout(() => {
-        inputScope.getRect()
-        // 位置が実際に変わった場合だけupdateCounterを更新
-        if (
-          !prevRect ||
-          prevRect.x !== inputScope.rect?.x ||
-          prevRect.y !== inputScope.rect?.y ||
-          prevRect.width !== inputScope.rect?.width ||
-          prevRect.height !== inputScope.rect?.height
-        ) {
-          setUpdateCounter((prev) => prev + 1)
-        }
-      }, 10)
-    }
-  }, [rootScope]) // updateCounterを依存配列から削除
-
-  // highlightRefのclassを更新する処理を追加
-  useEffect(() => {
+  // highlightRef の位置とスタイルを更新
+  useDeepCompareEffect(() => {
     if (!highlightRef.current) return
 
-    // まずクラスをリセット
     highlightRef.current.classList.remove('formula-selection-fill', 'formula-selection-border')
+    const style = highlightRef.current.style
+    if (!selectedScope || !selectedScope.rect) {
+      style.display = 'none'
+      return
+    }
 
-    if (selectedScope) {
-      // inputIndexの状態に基づいてクラスを設定
-      if (inputScope === null) {
-        highlightRef.current.classList.add('formula-selection-fill')
-      } else {
-        highlightRef.current.classList.add('formula-selection-border')
-      }
+    style.display = 'block'
+
+    if (inputScope === null) {
+      // 選択のみの場合（inputScope なし）
+      highlightRef.current.classList.add('formula-selection-fill')
+      style.left = `${selectedScope.rect.x}px`
+      style.top = `${selectedScope.rect.y}px`
+      style.width = `${selectedScope.rect.width}px`
+      style.height = `${selectedScope.rect.height}px`
+    } else {
+      // 入力中の場合（inputScope あり）
+      highlightRef.current.classList.add('formula-selection-border')
+      style.left = `${selectedScope.rect.x - 4}px`
+      style.top = `${selectedScope.rect.y - 2}px`
+      style.width = `${selectedScope.rect.width + 8}px`
+      style.height = `${selectedScope.rect.height + 4}px`
     }
   }, [selectedScope, inputScope])
 
-  const reLoad = () => {
-    if (!mathRef.current) return
+  // cursorRef の位置とスタイルを更新
+  useDeepCompareEffect(() => {
+    if (!cursorRef.current) return
 
-    const struct = getWholeStruct(mathRef.current)
-    console.log(structIndent(struct)) // 単なるログ
-
-    rootScope.reLink(struct)
-    rootScope.getRect()
-
-    // ここでcontainerRefのサイズをscope.rectに合わせる
-    if (rootScope.rect && containerRef.current) {
-      containerRef.current.style.width = `${rootScope.rect.width + 12}px`
-      containerRef.current.style.height = `${rootScope.rect.height + 12}px`
-      containerRef.current.style.position = 'relative'
+    if (inputScope === null) {
+      cursorRef.current.style.display = 'none'
+      return
     }
-  }
 
-  const handleMouseMove = (event: React.MouseEvent) => {
-    if (!isDragging || !dragStartPoint) return
-    const currentPoint = new DOMPoint(event.clientX, event.clientY)
-    updateSelectionHighlight(dragStartPoint, currentPoint)
-  }
+    console.log('hello')
+
+    if (inputScope?.rect !== undefined) {
+      cursorRef.current.style.display = 'block'
+      cursorRef.current.style.position = 'fixed'
+      cursorRef.current.style.left = `${inputScope.rect.x}px`
+      cursorRef.current.style.top = `${inputScope.rect.y}px`
+      cursorRef.current.style.height = `${inputScope.rect.height}px`
+      cursorRef.current.style.width = '1px'
+      cursorRef.current.style.backgroundColor = 'rgba(255, 127, 0, 1)'
+    }
+
+    console.log(cursorRef.current.style.display)
+  }, [inputScope?.rect])
 
   return (
     <div
       ref={containerRef}
       onMouseMove={handleMouseMove}
-      onMouseUp={() => setIsDragging(false)}
+      onMouseUp={() => setDragStartPoint(null)}
       className='flex items-center justify-center relative'
+      style={containerStyle}
     >
-      <div ref={highlightRef} style={getHighlightStyle()} />
-      <div ref={cursorRef} style={getCursorStyle()} />
+      <div ref={highlightRef} />
+      <div ref={cursorRef} className='z-[2]' />
       <div ref={mathRef} className='z-[1] select-none text-2xl'></div>
     </div>
   )
