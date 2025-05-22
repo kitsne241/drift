@@ -65,7 +65,7 @@ export default function Render() {
         cursorRef.current.style.display = 'none'
         cursorRef.current.classList.remove('cursor-blink')
       }
-    }, 100)
+    }, 30)
   }, [updateCounter])
 
   const deSelect = () => {
@@ -73,6 +73,10 @@ export default function Render() {
     setSelectedScope(null)
     setInputScope(null)
     setDragStartPoint(null)
+    if (cursorRef.current) {
+      cursorRef.current.style.display = 'none'
+      cursorRef.current.classList.remove('cursor-blink')
+    }
   }
 
   const handleMouseDown = useCallback(
@@ -119,6 +123,10 @@ export default function Render() {
             } else {
               // 通常スコープの左矢印では、親スコープに移動して左隣にカーソルを挿入
               const parent = selectedScope.parent
+              // parent.type === 'Frac' である場合、こうすると壊れる
+              // ので、parent の下に Product を挿入して移動する必要がある
+              // でも、まだ何も入力していない段階で不可逆的に rootScope を壊すのはまずい
+              // 編集手前の段階では rootScope のコピーを取って仮で入れていくべきなのか…？
               const index = parent.children.indexOf(selectedScope)
               parent.insertChild(input, index)
               setSelectedScope(parent)
@@ -193,7 +201,7 @@ export default function Render() {
           }
         }
 
-        // selectedScope.edit(event.key)
+        selectedScope.edit(event.key)
       }
 
       setUpdateCounter((prev) => prev + 1)
